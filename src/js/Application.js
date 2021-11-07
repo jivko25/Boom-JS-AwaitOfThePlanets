@@ -2,7 +2,6 @@ import EventEmitter from "eventemitter3";
 import image from "../images/planet.svg";
 
 export default class Application extends EventEmitter {
-
   static get events() {
     return {
       READY: "ready",
@@ -11,108 +10,71 @@ export default class Application extends EventEmitter {
 
   constructor() {
     super();
+    this._loading = document.querySelector("progress");
+    this.planets = [];
 
-    this._loading = document.getElementsByClassName('progress')[0];
-    this._load();
-    this._create();
     this._startLoading();
-    this._stopLoading();
-
-    this.arr = [];
-
-    const box = document.createElement("div");
-
-    box.innerHTML = this._render({
-      name: "Placeholder",
-      terrain: "placeholder",
-      population: 0,
-    });
-
     this.emit(Application.events.READY);
   }
 
-  _render({
-    name,
-    terrain,
-    population
-  }) {
-    return `
-              <article class="media">
-                <div class="media-left">
-                  <figure class="image is-64x64">
-                    <img src="${image}" alt="planet">
-                  </figure>
-                </div>
-                <div class="media-content">
-                  <div class="content">
-                  <h4>${name}</h4>
-                    <p>
-                      <span class="tag">${terrain}</span> <span class="tag">${population}</span>
-                      <br>
-                    </p>
-                  </div>
-                </div>
-              </article>
-    `;
-  }
-
   async _load() {
-    await fetch('https://swapi.boom.dev/api/planets')
-      .then(response => response.json())
-      .then(data => {
+    const URL = `https://swapi.boom.dev/api/planets/`;
 
-        let next = data.next;
-        let numberOfPages = parseInt(data.count / 10);
+    let res = await fetch(URL);
+    let planetsData = await res.json();
+    let next = planetsData.next;
+    this.planets = [...this.planets, ...planetsData.results];
+    while (next) {
+      res = await fetch(next);
+      planetsData = await res.json();
+      next = planetsData.next;
+      this.planets = [...this.planets, ...planetsData.results];
+    }
 
-        for (let i = 1; i <= numberOfPages; i++) {
-          next = next.substring(0, next.length - 1) + i;
-
-          console.log(next)
-
-          if (next !== null) {
-
-            fetch(next)
-              .then(response => response.json())
-              .then(data => {
-
-                data.results.map(j => {
-
-                  if (!this.arr.find(o => o.name === j.name)) {
-                    this.arr.push(j);
-
-                    this._create(j.name, j.terrain, j.population)
-
-                    const box = document.createElement("div");
-                    box.classList.add("box");
-
-                    box.innerHTML = this._render({
-                      name: j.name,
-                      terrain: j.terrain,
-                      population: j.population,
-                    });
-
-                    document.body.querySelector(".main").appendChild(box);
-
-                  }
-                })
-              });
-          }
-        }
-
-      })
+    this.planets.forEach((planet) => {
+      this._create(planet.name, planet.terrain, planet.population);
+    });
+    this._stopLoading();
   }
 
-  _create() {
-    this._startLoading()
-    this._load();
-    this._stopLoading()
+  _create(name, terrain, population) {
+    const planet = document.createElement("div");
+    planet.classList.add("box");
+    planet.innerHTML = this._render({
+      name: name,
+      terrain: terrain,
+      population: population,
+    });
+
+    document.body.querySelector(".main").appendChild(planet);
   }
 
-  _startLoading() {
-    this._loading.classList.remove('hide')
+  async _startLoading() {
+    await this._load();
   }
 
   _stopLoading() {
-    this._loading.classList.add('hide')
+    this._loading.style.display = "none";
+  }
+
+  _render({ name, terrain, population }) {
+    return `
+<article class="media">
+  <div class="media-left">
+    <figure class="image is-64x64">
+      <img src="${image}" alt="planet">
+    </figure>
+  </div>
+  <div class="media-content">
+    <div class="content">
+    <h4>${name}</h4>
+      <p>
+        <span class="tag">${terrain}</span> <span class="tag">${population}</span>
+        <br>
+      </p>
+    </div>
+  </div>
+</article>
+    `;
   }
 }
